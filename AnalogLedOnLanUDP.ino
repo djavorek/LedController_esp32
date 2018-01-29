@@ -1,11 +1,11 @@
-//Basic
+//Algorithm
 #include <algorithm>
 
 //WIFI
 #include "WiFi.h"
 #include "WiFiUdp.h"
 
-//LED Default Settings
+//LED Definitions
 #define LED_CHANNEL_RED 0
 #define LED_CHANNEL_GREEN 1
 #define LED_CHANNEL_BLUE 2
@@ -56,6 +56,7 @@ int defaultFade[9][3] = //Valid Fade Settings
   {192, 255, 62}, // LIGHT GREEN
   {0, 0, 153} // DARK BLUE
  };
+ 
  
 //_____________________________________________
 // Method - Connects to Wifi
@@ -430,6 +431,7 @@ void AnswerToPing(IPAddress remoteIP, uint16_t remotePort)
   Udp.endPacket();  
 }
 
+
 //_____________________________________________
 void setup()
 {
@@ -511,7 +513,7 @@ void loop()
     }
     
     //_____________________________________________
-    
+
     //Fade (Fade --> Normal fade, FadeSpeed(0-100) --> Customized fade)
     else if(strstr(udpMessage, "Fade")) 
     {
