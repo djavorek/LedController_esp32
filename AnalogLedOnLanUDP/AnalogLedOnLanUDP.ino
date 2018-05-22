@@ -401,22 +401,23 @@ void FadeMode(char message[])
   sprintf(status, "Fade:%d", fadeSpeed);
 }
 
-
-// Method - Answers the current status to the partner
-void AnswerToStatus(IPAddress remoteIP, uint16_t remotePort)
+// Method - Resets status if something was interrupted
+void ResetStatus()
 {
-  Serial.print("Answering with: ");
-  Serial.println(status);
-  Serial.print("to: ");
-  Serial.println(remoteIP);
-  Udp.beginPacket(remoteIP, remotePort);
-  Udp.print(status);
-  Udp.endPacket(); 
-    
   if(strstr(status, "Fade"))
   {
     FadeLoop(startAt, defaultFade, nextColorInFade);
   }
+}
+
+// Method - Answers the current status to the partner
+void AnswerToStatus(IPAddress remoteIP, uint16_t remotePort)
+{
+  Udp.beginPacket(remoteIP, remotePort);
+  Udp.print(status);
+  Udp.endPacket(); 
+    
+  ResetStatus();
 }
 
 // Method - Answers the current status to the asker
@@ -424,7 +425,9 @@ void AnswerToPing(IPAddress remoteIP, uint16_t remotePort)
 {
   Udp.beginPacket(remoteIP, remotePort);
   Udp.print("Pong");
-  Udp.endPacket();  
+  Udp.endPacket();
+  
+  ResetStatus();
 }
 
 void setup()
@@ -508,7 +511,7 @@ void loop()
     
     //_____________________________________________
 
-    // Fade (Fade --> Normal fade, FadeSpeed(0-100) --> Customized fade)
+    // Fade (Fade --> Normal fade, FadeSpeed:(0-100) --> Customized fade)
     else if(strstr(udpMessage, "Fade")) 
     {
       Serial.println("Fade Command!");
