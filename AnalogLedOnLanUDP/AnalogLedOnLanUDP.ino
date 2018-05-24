@@ -30,6 +30,7 @@ char* password  = "";
 
 // UDP
 unsigned int port = 2390;
+unsigned int responsePort = 2391;
 char udpMessage[255];
 WiFiUDP Udp;
 boolean isInterrupted;
@@ -241,6 +242,8 @@ void ColorCodeMode(char message[])
   {
     strcpy(status, "Off");
   }
+  
+  AnswerOnUdp(status);
 
   WriteRGB(RGB);
 }
@@ -395,14 +398,16 @@ void FadeMode(char message[])
     but for users the speed is more convenient */
     delayTime = (100 - fadeSpeed);
   }
+  
+  // Updating status and sending it back as a response
+  sprintf(status, "Fade:%d", fadeSpeed);
+  AnswerOnUdp(status);
     
   FadeLoop(startAt, defaultFade, nextColorInFade);
-
-  sprintf(status, "Fade:%d", fadeSpeed);
 }
 
-// Method - Resets status if something was interrupted
-void ResetStatus()
+// Method - Resets state if something was interrupted
+void ResetState()
 {
   if(strstr(status, "Fade"))
   {
@@ -410,24 +415,12 @@ void ResetStatus()
   }
 }
 
-// Method - Answers the current status to the partner
-void AnswerToStatus(IPAddress remoteIP, uint16_t remotePort)
+// Method - Sends a response message to the last client
+void AnswerOnUdp(char message[])
 {
-  Udp.beginPacket(remoteIP, remotePort);
-  Udp.print(status);
+  Udp.beginPacket(Udp.remoteIP(), responsePort);
+  Udp.print(message);
   Udp.endPacket(); 
-    
-  ResetStatus();
-}
-
-// Method - Answers the current status to the asker
-void AnswerToPing(IPAddress remoteIP, uint16_t remotePort)
-{
-  Udp.beginPacket(remoteIP, remotePort);
-  Udp.print("Pong");
-  Udp.endPacket();
-  
-  ResetStatus();
 }
 
 void setup()
@@ -490,15 +483,8 @@ void loop()
     if(strstr(udpMessage, "Status")) 
     {
       Serial.println("Status Command!");
-      AnswerToStatus(Udp.remoteIP(), 8082);
-    }
-    
-    /*Answers if someone search this controller on broadcast
-    (Ping --> Returns "Pong" string to the original sender)*/
-    else if(strstr(udpMessage, "Ping"))
-    {
-      Serial.println("Ping Command!");
-      AnswerToPing(Udp.remoteIP(), 8082);
+      AnswerOnUdp(status);
+      ResetState();
     }
     
     /*Set Wifi Credentials
