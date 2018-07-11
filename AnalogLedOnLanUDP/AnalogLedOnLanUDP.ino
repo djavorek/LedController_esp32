@@ -1,5 +1,6 @@
-// Algorithm
+// Basics
 #include <algorithm>
+#include <string.h>
 
 // WIFI
 #include "WiFi.h"
@@ -25,8 +26,8 @@
 
 
 // WiFi Credentials
-char* ssid      = "";
-char* password  = "";
+char ssid[]      = "";
+char password[]  = "";
 
 // UDP
 unsigned int port = 2390;
@@ -195,8 +196,8 @@ void LoadWifiCredentials()
   Serial.print("Password: ");
   Serial.println(pw);
   
-  ssid = id;
-  password = pw;
+  strncpy(ssid, id, sizeof ssid -1);
+  strncpy(password, pw, sizeof password -1);
 }
 
 //Method - Writes intensity to *LED Color Channel*
