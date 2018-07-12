@@ -18,12 +18,11 @@
 #define LED_PIN_GREEN 4
 #define LED_PIN_BLUE 16
 
-// NVS
-#include "esp_partition.h"
-#include "esp_err.h"
-#include "nvs_flash.h"
-#include "nvs.h"
 
+// HEADERS
+#include "LedColor.h"
+#include "NvsCredential.h"
+#include "WifiHelper.h"
 
 // WiFi Credentials
 char ssid[]      = "";
@@ -59,161 +58,6 @@ int defaultFade[10][3] = // Valid Fade Settings
   {0, 0, 153} // DARK BLUE
  };
  
-
-// Method - Connects to Wifi
-void ConnectToWifi() 
-{
-  int retries = 0;
-  Serial.println();
-  Serial.print("Connecting to: ");
-  Serial.println(ssid);
-  int status = WiFi.begin(ssid, password);
-
-  do
-  {
-    Serial.print(".");
-    delay(4000);
-    status = WiFi.begin(ssid, password);
-    retries++;
-  }while(status != WL_CONNECTED && retries < 10);
-  
-  if(status != WL_CONNECTED)
-  {
-    HostSoftAP();
-  }
-  else
-  {
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-}
-
-// Method - Creates Soft-AP (to modify normal AP credentials on it)
-void HostSoftAP()
-{
-  strcpy(status, "Disconnected");
-  WiFi.softAP("LedController");
-  IPAddress softIP = WiFi.softAPIP();
-  Serial.println("");
-  Serial.println("Soft-AP hosted on: ");
-  Serial.print(softIP);
-  
-  int Info[3] = {2,1,1};
-  WriteRGB(Info); //Shows a really dark color to tell something changed
-}
-
-// Method - Sets Wifi credential variables in Non-volatile storage
-void SaveWifiCredentials(char message[])
-{
-  char* credential;
-  
-  // NVS Initialize
-  esp_err_t err = nvs_flash_init();
-  
-  const esp_partition_t* nvs_partition = 
-  esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);      
-  if(!nvs_partition) printf("FATAL ERROR: No NVS partition found\n");
-    
-  nvs_handle handler;
-  err = nvs_open("storage", NVS_READWRITE, &handler);
-  if (err != ESP_OK) printf("FATAL ERROR: Unable to open NVS\n");
-  
-  // Clean old credentials from NVS
-  err = nvs_erase_key(handler, "ssid");
-  err = nvs_erase_key(handler, "secret");
-  
-  err = nvs_commit(handler);
-  
-  // Parses the message
-  credential = strtok (message, ":");
-
-  if (credential != NULL)
-  {
-    credential = strtok (NULL, ":");
-    err = nvs_set_str(handler, "ssid", credential);
-    Serial.println("Set SSID: ");
-    Serial.println(credential);
-  }
-
-  if (credential != NULL)
-  {
-    credential = strtok (NULL, ":");
-    err = nvs_set_str(handler, "secret", credential);
-    Serial.println("Set Secret: ");
-    Serial.println(credential);
-  }
-  else // If Wifi secret not provided, set it to empty string
-  {
-    err = nvs_set_str(handler, "secret", "");
-    Serial.println("Set Secret: ");
-    Serial.println(credential);
-  }
-  
-  err = nvs_commit(handler);
-  Serial.println("");
-  Serial.println("Credentials saved to NVS!");
-  Serial.println("");
-  
-  Serial.println("Restarting..");
-  delay(2000);
-  ESP.restart();
-}
-
-// Method - Gets Wifi credential variables from Non-volatile storage
-void LoadWifiCredentials()
-{
-  size_t string_size;
-  
-  // NVS Initialize
-  esp_err_t err = nvs_flash_init();
-  
-  const esp_partition_t* nvs_partition = 
-  esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);      
-  if(!nvs_partition) Serial.println("FATAL ERROR: No NVS partition found\n");
-    
-  nvs_handle handler;
-  err = nvs_open("storage", NVS_READWRITE, &handler);
-  if (err != ESP_OK) Serial.println("FATAL ERROR: Unable to open NVS\n");
-   
-  // Reading from NVS
-  Serial.println("");
-  Serial.println("Loading credentials from NVS");
-  Serial.println("");
-  
-  err = nvs_get_str(handler, "ssid", NULL, &string_size);
-  char* id = (char*)malloc(string_size);
-  err = nvs_get_str(handler, "ssid", id, &string_size);
-  
-  err = nvs_get_str(handler, "secret", NULL, &string_size);
-  char* pw = (char*)malloc(string_size);
-  err = nvs_get_str(handler, "secret", pw, &string_size);
-
-  
-  Serial.print("SSID: ");
-  Serial.println(id);
-  Serial.print("Password: ");
-  Serial.println(pw);
-  
-  strncpy(ssid, id, sizeof ssid -1);
-  strncpy(password, pw, sizeof password -1);
-}
-
-//Method - Writes intensity to *LED Color Channel*
-void WriteToLedChannel(uint8_t channel, uint32_t value, uint32_t valueMax = 255) 
-{
-  uint32_t duty = (8191 / valueMax) * _min(value, valueMax);
-  ledcWrite(channel, duty);
-}
-
-// Method - Writes RGB Array To LED in one step
-void WriteRGB(int RGB[])
-{
-  WriteToLedChannel(LED_CHANNEL_RED, RGB[0]);
-  WriteToLedChannel(LED_CHANNEL_GREEN, RGB[1]);
-  WriteToLedChannel(LED_CHANNEL_BLUE, RGB[2]);
-}
 
 // Method - Parses the color code from UDP Message and writes it to the LED (e.g.: 255:255:255 --> White)
 void ColorCodeMode(char message[])
@@ -443,10 +287,10 @@ void setup()
   Serial.println();
 
   // Load the credentials from NVS
-  LoadWifiCredentials();
+  LoadWifiCredentials(ssid, password);
 
   // Connect to WiFi
-  ConnectToWifi();
+  ConnectToWifi(ssid, password);
 
   // Open UDP
   Udp.begin(port);
@@ -457,7 +301,7 @@ void loop()
   // If WiFi gets disconnected, tries to connect again
   if (WiFi.status() != WL_CONNECTED && !WiFi.softAPIP())
   {
-    ConnectToWifi();
+    ConnectToWifi(ssid, password);
   }
 
   // Checking the size of the last incoming UDP packet, as it is empty or not
