@@ -1,15 +1,29 @@
 // Basics
-#include "Arduino.h"
+#include "HardwareSerial.h"
+#include <string.h>
 
 // WIFI
 #include "WiFi.h"
 #include "WiFiUdp.h"
 
 // HEADERS
-#include "LedColor.h"
-#include "WiFiHelper.h"
+#include "ColorHelper.h"
 
-void ConnectToWifi(char ssid[], char password[]) 
+void HostSoftAP(char* deviceName)
+{
+  char softApSSID[50] = "Led_";
+  strncat(softApSSID, deviceName, sizeof(softApSSID) - 14); //Magic number: Length of 'LedController '
+  WiFi.softAP(softApSSID);
+  IPAddress softIP = WiFi.softAPIP();
+  Serial.println("");
+  Serial.println("Soft-AP hosted on: ");
+  Serial.print(softIP);
+  
+  int Info[3] = {40,40,40};
+  WriteRGB(Info); //Shows a dark color to tell something changed
+}
+
+void ConnectToWifi(char ssid[], char password[], char* deviceName) 
 {
   int retries = 0;
   Serial.println();
@@ -27,7 +41,7 @@ void ConnectToWifi(char ssid[], char password[])
   
   if(status != WL_CONNECTED)
   {
-    HostSoftAP();
+    HostSoftAP(deviceName);
   }
   else
   {
@@ -38,14 +52,4 @@ void ConnectToWifi(char ssid[], char password[])
   }
 }
 
-void HostSoftAP()
-{
-  WiFi.softAP("LedController");
-  IPAddress softIP = WiFi.softAPIP();
-  Serial.println("");
-  Serial.println("Soft-AP hosted on: ");
-  Serial.print(softIP);
-  
-  int Info[3] = {2,1,1};
-  WriteRGB(Info); //Shows a really dark color to tell something changed
-}
+

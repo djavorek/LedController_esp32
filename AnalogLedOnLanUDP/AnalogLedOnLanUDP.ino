@@ -20,13 +20,16 @@
 
 
 // HEADERS
-#include "LedColor.h"
-#include "NvsCredential.h"
+#include "ColorHelper.h"
+#include "NvsHelper.h"
 #include "WifiHelper.h"
 
+//Device Name
+char* deviceName = "alpha";
+
 // WiFi Credentials
-char ssid[]      = "";
-char password[]  = "";
+char ssid[35]      = "";
+char password[35]  = "";
 
 // UDP
 unsigned int port = 2390;
@@ -287,10 +290,10 @@ void setup()
   Serial.println();
 
   // Load the credentials from NVS
-  LoadWifiCredentials(ssid, password);
+  LoadWifiCredentials(ssid, sizeof(ssid), password, sizeof(password));
 
   // Connect to WiFi
-  ConnectToWifi(ssid, password);
+  ConnectToWifi(ssid, password, deviceName);
 
   // Open UDP
   Udp.begin(port);
@@ -301,7 +304,7 @@ void loop()
   // If WiFi gets disconnected, tries to connect again
   if (WiFi.status() != WL_CONNECTED && !WiFi.softAPIP())
   {
-    ConnectToWifi(ssid, password);
+    ConnectToWifi(ssid, password, deviceName);
   }
 
   // Checking the size of the last incoming UDP packet, as it is empty or not
