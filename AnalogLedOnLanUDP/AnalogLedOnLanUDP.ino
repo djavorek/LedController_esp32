@@ -44,11 +44,11 @@ char status[25] = "Off";
 
 /* Fade Settings, most of these used for
 start fade again if it was interrupted */
-int delayTime;
-int startAt[3] = {0, 0, 0};
+int fadeFrameTime;
+int fadeFrom[3] = {0, 0, 0};
 int nextColorInFade = 0;
 
-int defaultFade[10][3] = // Valid Fade Settings
+int fadePalette[10][3] = // Valid Fade Settings
  {
   {255, 255, 255}, //White
   {255, 2, 0}, // RED
@@ -98,7 +98,7 @@ void ColorCodeMode(char message[])
 
 /* Method - Fades between two given color, with a given delay speed between each frame
  Returns: True if finished without interruption */
-boolean FadeToColorWriter(int currentState[], int fadeTo[], int delTime)
+boolean FadeToColorWriter(int currentState[], int fadeTo[], int frameTime)
 {
   int colorDifferences[3];
   int colorDifferencesNotNegative[3];
@@ -134,7 +134,7 @@ boolean FadeToColorWriter(int currentState[], int fadeTo[], int delTime)
   /* "Step before start", - to reach the perfect color as result,
    it writes the remenent color differences first to be nearly invisible, still simple*/
   WriteRGB(currentState);
-  delay(delTime);
+  delay(frameTime);
 
   // Cycles through the steps, 'till we reach the needed color
   while (currentState[0] != fadeTo[0] || currentState[1] != fadeTo[1] || currentState[2] != fadeTo[2])
@@ -150,13 +150,12 @@ boolean FadeToColorWriter(int currentState[], int fadeTo[], int delTime)
     // If UDP Received, stop fading
     if (Udp.parsePacket() != 0)
     {
-      memcpy(startAt, currentState, sizeof(currentState));
+      memcpy(fadeFrom, currentState, sizeof(currentState));
       return false;
     }
 
     WriteRGB(currentState);
-    Serial.println("Changing color..");
-    delay(delTime);
+    delay(frameTime);
   }
   
   return true;
@@ -169,7 +168,7 @@ void FadeLoop(int startColor[3], int loopColors[][3], int nextColor)
 
   Serial.println();
   Serial.print("In fade loop, delay: ");
-  Serial.println(delayTime);
+  Serial.println(fadeFrameTime);
     
   // Fading Process
   do
@@ -179,52 +178,51 @@ void FadeLoop(int startColor[3], int loopColors[][3], int nextColor)
     {
         for (int color = nextColor; color < 8; color++)
         {
-          Serial.println("Fade");
-          boolean isDone = FadeToColorWriter(startColor, loopColors[color], delayTime);
+          Serial.println("New Fade Color");
+          boolean isDone = FadeToColorWriter(startColor, loopColors[color], fadeFrameTime);
           if (isDone != true)
           {
-            // startAt is already overwritten inside FadeToColorWriter
+            // fadeFrom is already overwritten inside FadeToColorWriter
+            Serial.println();
+            Serial.println("Fade interrupted!");
+            Serial.println();
             isInterrupted = true;
             nextColorInFade = color;
-            break;
+            WriteRGB(off);
+            return;
           }
           else
           {
             memcpy(startColor, loopColors[color], sizeof(startColor));
-            delay(delayTime*3); // Waits 3 frame, when it reaches the needed color
+            delay(fadeFrameTime*3); // Waits 3 frame, when it reaches the needed color
           }
         }
         
         nextColor = 0; // To skip this section later on
     }
-  
-    if(isInterrupted == false)
+    
+    for (int color = 0; color < 8; color++)
     {
-      for (int color = 0; color < 8; color++)
+      Serial.println("New Fade Color");
+      boolean isDone = FadeToColorWriter(startColor, loopColors[color], fadeFrameTime);
+      if (isDone != true)
       {
-        Serial.println("Fade");
-        boolean isDone = FadeToColorWriter(startColor, loopColors[color], delayTime);
-        if (isDone != true)
-        {
-          // startAt is already overwritten inside FadeToColorWriter
-          isInterrupted = true;
-          nextColorInFade = color;
-          break;
-        }
-        else
-        {
-          memcpy(startColor, loopColors[color], sizeof(startColor));
-          delay(delayTime*3); // Waits 3 frame, when it reaches the needed color
-        }
+        // fadeFrom is already overwritten inside FadeToColorWriter
+        Serial.println();
+        Serial.println("Fade interrupted!");
+        Serial.println();
+        isInterrupted = true;
+        nextColorInFade = color;
+        WriteRGB(off);
+        return;
+      }
+      else
+      {
+        memcpy(startColor, loopColors[color], sizeof(startColor));
+        delay(fadeFrameTime*3); // Waits 3 frame, when it reaches the needed color
       }
     }
-  } while (isInterrupted == false && WiFi.status() == WL_CONNECTED);
-
-  WriteRGB(off);
-
-  Serial.println();
-  Serial.println("Fade interrupted!");
-  Serial.println();
+  } while (WiFi.status() == WL_CONNECTED);
 }
 
 // Method - Parse the fade properties from UDP Message
@@ -233,7 +231,7 @@ void FadeMode(char message[])
   int fadeSpeed;
   char * delimittedMsg;
 
-  delayTime = 20;
+  fadeFrameTime = 20;
 
   // Checking the message to know, its speed customized, or basic
   delimittedMsg = strtok (message, ":");
@@ -244,14 +242,14 @@ void FadeMode(char message[])
     
     /* We actually use minor delays between frames,
     but for users the speed is more convenient */
-    delayTime = (100 - fadeSpeed);
+    fadeFrameTime = (100 - fadeSpeed);
   }
   
   // Updating status and sending it back as a response
   sprintf(status, "Fade:%d", fadeSpeed);
   AnswerOnUdp(status);
     
-  FadeLoop(startAt, defaultFade, nextColorInFade);
+  FadeLoop(fadeFrom, fadePalette, nextColorInFade);
 }
 
 // Method - Resets state if something was interrupted
@@ -259,7 +257,7 @@ void ResetState()
 {
   if(strstr(status, "Fade"))
   {
-    FadeLoop(startAt, defaultFade, nextColorInFade);
+    FadeLoop(fadeFrom, fadePalette, nextColorInFade);
   }
 }
 
