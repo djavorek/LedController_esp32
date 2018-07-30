@@ -1,6 +1,7 @@
 // Basics
 #include <algorithm>
 #include <string.h>
+#include <stdio.h>
 
 // WIFI
 #include "WiFi.h"
@@ -36,20 +37,25 @@ unsigned int port = 2390;
 unsigned int responsePort = 2391;
 char udpMessage[255];
 WiFiUDP Udp;
-boolean isInterrupted;
 char* delimiterFound;
 
 // Status
 char status[25] = "Off";
+
+// Observed special commands
+char statusCommand[30];
+char* credentialsCommand;
+char* fadeCommand;
 
 /* Fade Settings, most of these used for
 start fade again if it was interrupted */
 int fadeFrameTime;
 int fadeFrom[3] = {0, 0, 0};
 int nextColorInFade = 0;
+boolean isInterrupted;
 
 int fadePalette[10][3] = // Valid Fade Settings
- {
+{
   {255, 255, 255}, //White
   {255, 2, 0}, // RED
   {0, 255, 0}, // GREEN
@@ -59,46 +65,57 @@ int fadePalette[10][3] = // Valid Fade Settings
   {255, 165, 0}, // ORANGE
   {192, 255, 62}, // LIGHT GREEN
   {0, 0, 153} // DARK BLUE
- };
- 
+};
+
 
 // Method - Parses the color code from UDP Message and writes it to the LED (e.g.: 255:255:255 --> White)
 void ColorCodeMode(char message[])
 {
-  char * colorIntensity;
-  int RGB[3] = {0,0,0};
-  
-  // Parses the message
-  colorIntensity = strtok (message, ":");
-  RGB[0] = atoi(colorIntensity);
+  char * messageSection;
+  int RGBA[4] = {0, 0, 0, 255};
 
-  if (colorIntensity != NULL)
+  // Parses the message
+  messageSection = strtok (message, ":");
+  RGBA[0] = atoi(messageSection);
+
+  if (messageSection != 0)
   {
-    colorIntensity = strtok (NULL, ":");
-    RGB[1] = atoi(colorIntensity);
+    messageSection = strtok (NULL, ":");
+    RGBA[1] = atoi(messageSection);
   }
 
-  if (colorIntensity != NULL)
+  if (messageSection != 0)
   {
-    colorIntensity = strtok (NULL, ":");
-    RGB[2] = atoi(colorIntensity);
+    messageSection = strtok (NULL, ":");
+    RGBA[2] = atoi(messageSection);
+  }
+  
+  if (messageSection != 0)
+  {
+    messageSection = strtok (NULL, ":");
+    RGBA[3] = atoi(messageSection);
   }
   
   // Setting Color Code as Status
-  sprintf(status, "%d:%d:%d", RGB[0], RGB[1], RGB[2]);
-  if(strcmp(status, "0:0:0") == 0)
+  sprintf(status, "%d:%d:%d:%d", RGBA[0], RGBA[1], RGBA[2], RGBA[3]);
+  if (strstr(status, "0:0:0:"))
   {
     strcpy(status, "Off");
   }
-  
+
   AnswerOnUdp(status);
 
-  WriteRGB(RGB);
+  double alpha = RGBA[3] / 255;
+  RGBA[0] = RGBA[0] * alpha;
+  RGBA[1] = RGBA[1] * alpha;
+  RGBA[2] = RGBA[2] * alpha;
+
+  WriteRGB(RGBA);
 }
 
 /* Method - Fades between two given color, with a given delay speed between each frame
  Returns: True if finished without interruption */
-boolean FadeToColorWriter(int currentState[], int fadeTo[], int frameTime)
+boolean FadeToColorWriter(int currentColor[], int fadeTo[], int frameTime)
 {
   int colorDifferences[3];
   int colorDifferencesNotNegative[3];
@@ -108,7 +125,7 @@ boolean FadeToColorWriter(int currentState[], int fadeTo[], int frameTime)
   // Calculates the differences between each components of the two color
   for (int component = 0; component < 3; component++)
   {
-    colorDifferences[component] = fadeTo[component] - currentState[component];
+    colorDifferences[component] = fadeTo[component] - currentColor[component];
     if (colorDifferences[component] < 0)
     {
       colorDifferencesNotNegative[component] = colorDifferences[component] * -1;
@@ -126,38 +143,38 @@ boolean FadeToColorWriter(int currentState[], int fadeTo[], int frameTime)
     if (howManySteps[component] == 0) {
       howManySteps[component] = 1;
     }
-    
+
     increasement[component] = div(colorDifferences[component], howManySteps[component]);
-    currentState[component] = currentState[component] + increasement[component].rem;
+    currentColor[component] = currentColor[component] + increasement[component].rem;
   }
 
   /* "Step before start", - to reach the perfect color as result,
    it writes the remenent color differences first to be nearly invisible, still simple*/
-  WriteRGB(currentState);
+  WriteRGB(currentColor);
   delay(frameTime);
 
-  // Cycles through the steps, 'till we reach the needed color
-  while (currentState[0] != fadeTo[0] || currentState[1] != fadeTo[1] || currentState[2] != fadeTo[2])
+  // Cycles through the steps, to the wanted color
+  while (currentColor[0] != fadeTo[0] || currentColor[1] != fadeTo[1] || currentColor[2] != fadeTo[2])
   {
     for (int component = 0; component < 3 ; component++)
     {
-      if (currentState[component] != fadeTo[component])
+      if (currentColor[component] != fadeTo[component])
       {
-        currentState[component] += increasement[component].quot;
+        currentColor[component] += increasement[component].quot;
       }
     }
-    
+
     // If UDP Received, stop fading
     if (Udp.parsePacket() != 0)
     {
-      memcpy(fadeFrom, currentState, sizeof(currentState));
+      memcpy(fadeFrom, currentColor, sizeof(currentColor));
       return false;
     }
 
-    WriteRGB(currentState);
+    WriteRGB(currentColor);
     delay(frameTime);
   }
-  
+
   return true;
 }
 
@@ -169,38 +186,38 @@ void FadeLoop(int startColor[3], int loopColors[][3], int nextColor)
   Serial.println();
   Serial.print("In fade loop, delay: ");
   Serial.println(fadeFrameTime);
-    
+
   // Fading Process
   do
   {
     // It is used for finishing interrupted fade loops, then the normal loop can start
-    if(nextColor != 0)
+    if (nextColor != 0)
     {
-        for (int color = nextColor; color < 8; color++)
+      for (int color = nextColor; color < 8; color++)
+      {
+        Serial.println("New Fade Color");
+        boolean isDone = FadeToColorWriter(startColor, loopColors[color], fadeFrameTime);
+        if (isDone != true)
         {
-          Serial.println("New Fade Color");
-          boolean isDone = FadeToColorWriter(startColor, loopColors[color], fadeFrameTime);
-          if (isDone != true)
-          {
-            // fadeFrom is already overwritten inside FadeToColorWriter
-            Serial.println();
-            Serial.println("Fade interrupted!");
-            Serial.println();
-            isInterrupted = true;
-            nextColorInFade = color;
-            WriteRGB(off);
-            return;
-          }
-          else
-          {
-            memcpy(startColor, loopColors[color], sizeof(startColor));
-            delay(fadeFrameTime*3); // Waits 3 frame, when it reaches the needed color
-          }
+          // fadeFrom is already overwritten inside FadeToColorWriter
+          Serial.println();
+          Serial.println("Fade interrupted!");
+          Serial.println();
+          isInterrupted = true;
+          nextColorInFade = color;
+          WriteRGB(off);
+          return;
         }
-        
-        nextColor = 0; // To skip this section later on
+        else
+        {
+          memcpy(startColor, loopColors[color], sizeof(startColor));
+          delay(fadeFrameTime * 3); // Waits 3 frame, when it reaches the needed color
+        }
+      }
+
+      nextColor = 0; // To skip this section later on
     }
-    
+
     for (int color = 0; color < 8; color++)
     {
       Serial.println("New Fade Color");
@@ -219,7 +236,7 @@ void FadeLoop(int startColor[3], int loopColors[][3], int nextColor)
       else
       {
         memcpy(startColor, loopColors[color], sizeof(startColor));
-        delay(fadeFrameTime*3); // Waits 3 frame, when it reaches the needed color
+        delay(fadeFrameTime * 3); // Waits 3 frame, when it reaches the needed color
       }
     }
   } while (WiFi.status() == WL_CONNECTED);
@@ -235,27 +252,27 @@ void FadeMode(char message[])
 
   // Checking the message to know, its speed customized, or basic
   delimittedMsg = strtok (message, ":");
-  if (!strcmp(delimittedMsg, "FadeSpeed")) 
+  if (!strcmp(delimittedMsg, "FadeSpeed"))
   {
     delimittedMsg = strtok (NULL, ":");
     fadeSpeed = atoi(delimittedMsg);
-    
+
     /* We actually use minor delays between frames,
     but for users the speed is more convenient */
     fadeFrameTime = (100 - fadeSpeed);
   }
-  
+
   // Updating status and sending it back as a response
   sprintf(status, "Fade:%d", fadeSpeed);
   AnswerOnUdp(status);
-    
+
   FadeLoop(fadeFrom, fadePalette, nextColorInFade);
 }
 
 // Method - Resets state if something was interrupted
 void ResetState()
 {
-  if(strstr(status, "Fade"))
+  if (strstr(status, "Fade"))
   {
     FadeLoop(fadeFrom, fadePalette, nextColorInFade);
   }
@@ -266,7 +283,7 @@ void AnswerOnUdp(char message[])
 {
   Udp.beginPacket(Udp.remoteIP(), responsePort);
   Udp.print(message);
-  Udp.endPacket(); 
+  Udp.endPacket();
 }
 
 void setup()
@@ -280,6 +297,10 @@ void setup()
 
   ledcSetup(LED_CHANNEL_BLUE, LEDC_BASE_FREQ, LEDC_TIMER_13_BIT);
   ledcAttachPin(LED_PIN_BLUE, LED_CHANNEL_BLUE);
+  
+  sprintf(statusCommand, "Status:%s", deviceName);
+  credentialsCommand = "Credentials";
+  fadeCommand = "Fade";
 
   // Open Serial Printing
   Serial.begin(115200);
@@ -298,7 +319,7 @@ void setup()
 }
 
 void loop()
-{ 
+{
   // If WiFi gets disconnected, tries to connect again
   if (WiFi.status() != WL_CONNECTED && !WiFi.softAPIP())
   {
@@ -312,7 +333,7 @@ void loop()
 
     // Read the UDP packet into a message variable
     int msgLength = Udp.read(udpMessage, 255);
-    if(msgLength > 0)
+    if (msgLength > 0)
     {
       udpMessage[msgLength] = 0;
     }
@@ -321,37 +342,35 @@ void loop()
     Serial.println("UDP Packet Received: ");
     Serial.println(udpMessage);
     Serial.println();
-    
+
     //_____________________________________________
 
-    /*Answers the current status 
+    /*Answers the current status
     (Status --> Fade, Status --> 255:255:255, Status --> Off)*/
-    if(strstr(udpMessage, "Status")) 
+    if (strstr(udpMessage, statusCommand))
     {
       Serial.println("Status Command!");
       AnswerOnUdp(status);
       ResetState();
     }
-    
+
     /*Set Wifi Credentials
     (Credentials:Ssid:Password --> It will connect with(Ssid,Password)*/
-    else if(strstr(udpMessage, "Credentials"))
+    else if (strstr(udpMessage, credentialsCommand))
     {
       Serial.println("Credentials Command!");
       SaveWifiCredentials(udpMessage);
     }
-    
-    //_____________________________________________
 
     // Fade (Fade --> Normal fade, FadeSpeed:(0-100) --> Customized fade)
-    else if(strstr(udpMessage, "Fade")) 
+    else if (strstr(udpMessage, fadeCommand))
     {
       Serial.println("Fade Command!");
       FadeMode(udpMessage);
     }
 
     // Color Code (255:255:255 --> White)
-    else if(strchr(udpMessage, ':')) 
+    else if (strchr(udpMessage, ':'))
     {
       Serial.println("Color Code Command!");
       ColorCodeMode(udpMessage);
