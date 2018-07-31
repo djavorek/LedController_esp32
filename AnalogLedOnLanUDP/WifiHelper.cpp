@@ -12,7 +12,7 @@
 void HostSoftAP(char* deviceName)
 {
   char softApSSID[50] = "Led_";
-  strncat(softApSSID, deviceName, sizeof(softApSSID) - 14); //Magic number: Length of 'LedController '
+  strncat(softApSSID, deviceName, sizeof(softApSSID) - strlen(softApSSID)); 
   WiFi.softAP(softApSSID);
   IPAddress softIP = WiFi.softAPIP();
   Serial.println("");
