@@ -1,7 +1,9 @@
 #ifndef COLOR_HELPER_H
 #define COLOR_HELPER_H
 
-//Method - Writes intensity to *LED Color Channel*
+#include "Arduino.h"
+
+//Method - Writes intensity to *LED Color Channels*
 void WriteToLedChannel(uint8_t channel, uint32_t value);
 
 // Method - Writes RGB Array To LED in one step

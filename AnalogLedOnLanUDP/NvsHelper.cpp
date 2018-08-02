@@ -1,8 +1,4 @@
-// Basics
-#include <string.h>
 #include "Arduino.h"
-
-// NVS
 #include "esp_partition.h"
 #include "esp_err.h"
 #include "nvs_flash.h"

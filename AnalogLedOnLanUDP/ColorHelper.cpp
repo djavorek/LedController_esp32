@@ -1,11 +1,6 @@
-// Basics
 #include "Arduino.h"
 
-// LED Definitions
-#define LED_CHANNEL_RED 0
-#define LED_CHANNEL_GREEN 1
-#define LED_CHANNEL_BLUE 2
-
+#include "LedDef.h"
 
 void WriteToLedChannel(uint8_t channel, uint32_t value) 
 {

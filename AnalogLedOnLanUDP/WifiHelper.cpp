@@ -1,12 +1,7 @@
-// Basics
 #include "HardwareSerial.h"
-#include <string.h>
-
-// WIFI
 #include "WiFi.h"
 #include "WiFiUdp.h"
 
-// HEADERS
 #include "ColorHelper.h"
 
 void HostSoftAP(char* deviceName)
