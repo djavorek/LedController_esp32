@@ -73,25 +73,30 @@ void FadeMode(char message[])
 {
   int fadeSpeed;
   int fadeFrameTime = 20;
-  char * delimittedMsg;
+  int isRainbow = 0;
+  char * fadeProperty;
 
-  // Checking the message to know, its speed customized, or basic
-  delimittedMsg = strtok (message, ":");
-  if (!strcmp(delimittedMsg, "FadeSpeed"))
+  //Fade String (does not matter)
+  fadeProperty = strtok (message, ":");
+  if (strstr(fadeProperty, "Rainbow"))
   {
-    delimittedMsg = strtok (NULL, ":");
-    fadeSpeed = atoi(delimittedMsg);
-
+    isRainbow = 1;
+  }
+  
+  fadeProperty = strtok (NULL, ":");
+  if (fadeProperty != NULL) {
+    fadeSpeed = atoi(fadeProperty);
+    
     /* We actually use minor delays between frames,
     but for users the speed is more convenient */
-    fadeFrameTime = (101 - fadeSpeed) / 4;
+    fadeFrameTime = (101 - fadeSpeed) / 3;
   }
 
   // Updating status and sending it back as a response
   sprintf(status, "Fade:%d", fadeSpeed);
   AnswerOnUdp(status);
-
-  FadeLoop(fadeFrameTime, &udp);
+  
+  FadeLoop(fadeFrameTime, isRainbow, &udp);
 }
 
 // Method - Resets state if something was interrupted
@@ -99,7 +104,7 @@ void ResetState()
 {
   if (strstr(status, "Fade"))
   {
-    FadeLoop(-1, &udp);
+    FadeLoop(-1, -1, &udp);
   }
 }
 
@@ -181,9 +186,9 @@ void loop()
     }
 
     // Fade (Fade --> Normal fade, FadeSpeed:(0-100) --> Customized fade)
-    else if (strstr(udpMessage, "Fade"))
+    else if (strstr(udpMessage, "Fade") || strstr(udpMessage, "Rainbow"))
     {
-      Serial.println("Fade Command!");
+      Serial.println("Some kind of Fade Command!");
       FadeMode(udpMessage);
     }
 

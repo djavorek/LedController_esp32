@@ -4,9 +4,15 @@
 #include "ColorHelper.h"
 
 int frameTime;
+boolean interrupted;
+int isRainbow = 0;
+
+//Fade (with palette)
 int from[3] = {0, 0, 0};
 int nextColorFromPalette = 0;
-boolean interrupted;
+
+//Rainbow
+int savedProgress = 0;
 
 int fadePalette[10][3] =
 {
@@ -45,18 +51,22 @@ boolean FadeToColorWriter(int currentColor[], int fadeTo[], int frameTime, WiFiU
     WriteRGB(currentColor);
     delay(frameTime);
   }
-  
   return true;
 }
 
 // Method - Looping through fade colors
-void FadeLoop(int loopFrameTime, WiFiUDP* udp)
+void FadeLoop(int loopFrameTime, int isRainbowLoop, WiFiUDP* udp)
 {
   interrupted = false;
   
   if (loopFrameTime != -1)
   {
     frameTime = loopFrameTime;
+  }
+  
+  if (isRainbowLoop != -1)
+  {
+     isRainbow = isRainbowLoop;
   }
   
   int off[3] = {0, 0, 0};
@@ -67,23 +77,53 @@ void FadeLoop(int loopFrameTime, WiFiUDP* udp)
 
   do
   {
-    for (int color = nextColorFromPalette; color < 8; color++)
+    if (isRainbow)
     {
-      Serial.println("New Fade Color");
-      boolean isDone = FadeToColorWriter(from, fadePalette[color], frameTime, udp);
-      if (isDone != true)
+      Serial.println("Rainbow Loop");
+      for (int progress=savedProgress; progress < 360; progress++)
       {
-        nextColorFromPalette = color;
+        Serial.println("Rainbow progress..");
+        float x = float(progress);
+        int r = int(127*(sin(x/180*PI)+1));
+        int g = int(127*(sin(x/180*PI+3/2*PI)+1));
+        int b = int(127*(sin(x/180*PI+0.5*PI)+1));
+        
+        int color[3] = {r,g,b};
+        WriteRGB(color);
+        delay(frameTime);
+        
+        // If UDP Received, stop fading
+        if (udp->parsePacket() != 0)
+        {
+        savedProgress = progress++;
         interrupted = true;
         WriteRGB(off);
         return;
+        }
       }
-      else
-      {
-        memcpy(from, fadePalette[color], sizeof(fadePalette[color]));
-      }
+      savedProgress = 0;
     }
-    nextColorFromPalette = 0;
+    else
+    {
+      Serial.println("Fade Loop");
+      for (int color = nextColorFromPalette; color < 8; color++)
+      {
+        Serial.println("New Fade Color");
+        boolean isDone = FadeToColorWriter(from, fadePalette[color], frameTime, udp);
+        if (isDone != true)
+        {
+          nextColorFromPalette = color;
+          interrupted = true;
+          WriteRGB(off);
+          return;
+        }
+        else
+        {
+          memcpy(from, fadePalette[color], sizeof(fadePalette[color]));
+        }
+      }
+      nextColorFromPalette = 0;
+    }
   } while (WiFi.status() == WL_CONNECTED);
 }
 
