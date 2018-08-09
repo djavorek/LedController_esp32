@@ -19,7 +19,6 @@ unsigned int port = 2390;
 unsigned int responsePort = 2391;
 char udpMessage[255];
 WiFiUDP udp;
-char* delimiterFound;
 
 // Status
 char status[25] = "Off";
@@ -31,23 +30,26 @@ void ColorCodeMode(char message[])
 
   // Parses the message
   char* messageSection = messageSection = strtok (message, ":");
-  RGBA[0] = atoi(messageSection);
-
   if (messageSection != NULL)
   {
-    messageSection = strtok (NULL, ":");
+    RGBA[0] = atoi(messageSection);
+  }
+
+  messageSection = strtok (NULL, ":");
+  if (messageSection != NULL)
+  {
     RGBA[1] = atoi(messageSection);
   }
 
+  messageSection = strtok (NULL, ":");
   if (messageSection != NULL)
   {
-    messageSection = strtok (NULL, ":");
     RGBA[2] = atoi(messageSection);
   }
   
+  messageSection = strtok (NULL, ":");
   if (messageSection != NULL)
   {
-    messageSection = strtok (NULL, ":");
     RGBA[3] = atoi(messageSection);
   }
 
@@ -57,46 +59,78 @@ void ColorCodeMode(char message[])
   {
     strcpy(status, "Off");
   }
-
+  
   AnswerOnUdp(status);
+  Serial.println(status);
 
+  //Intentionally written after status set, so the status is more meaningful (not showing black color)
   float alpha = (float)RGBA[3] / (float)255;
   RGBA[0] = RGBA[0] * alpha;
   RGBA[1] = RGBA[1] * alpha;
   RGBA[2] = RGBA[2] * alpha;
-
+  
+  //If the next command is fade, it will start from this color
+  setFadeStartingPoint(RGBA);
+  
   WriteRGB(RGBA);
 }
 
 // Method - Parse the fade properties from UDP Message
 void FadeMode(char message[])
 {
-  int fadeSpeed;
-  int fadeFrameTime = 20;
-  int isRainbow = 0;
   char * fadeProperty;
+  int fadeMode = 0;
+  int fadeSpeed = 128;
+  int fadeFrameTime;
+  int fadeAlphaInt = 255;
+  double fadeAlpha;
 
-  //Fade String (does not matter)
+  //Fade String
   fadeProperty = strtok (message, ":");
-  if (strstr(fadeProperty, "Rainbow"))
+  
+  //Mode
+  fadeProperty = strtok (NULL, ":");
+  if (fadeProperty != NULL)
   {
-    isRainbow = 1;
+    fadeMode = atoi(fadeProperty);
   }
   
+  //Speed
   fadeProperty = strtok (NULL, ":");
-  if (fadeProperty != NULL) {
+  if (fadeProperty != NULL)
+  {
     fadeSpeed = atoi(fadeProperty);
-    
-    /* We actually use minor delays between frames,
-    but for users the speed is more convenient */
-    fadeFrameTime = (101 - fadeSpeed) / 3;
+    if(fadeSpeed > 255)
+    {
+      fadeSpeed = 255; 
+    }
   }
+  /* We actually use minor delays (and magic numbers to calculate them)
+  between frames, but for users the speed is more convenient 
+  Magic numbers: (definesFastest - fadeSpeed) / definesSlowest */
+  fadeFrameTime = (300 - fadeSpeed) / 2.2; 
+  
+  //Alpha
+  fadeProperty = strtok (NULL, ":");
+  if (fadeProperty != NULL)
+  {
+    fadeAlphaInt = atoi(fadeProperty);
+    if(fadeAlphaInt > 255)
+    {
+      fadeAlphaInt = 255; 
+    }
+  }
+  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.5) / (double)2;
 
   // Updating status and sending it back as a response
-  sprintf(status, "Fade:%d", fadeSpeed);
+  sprintf(status, "Fade:%d:%d:%d", fadeMode, fadeSpeed, fadeAlphaInt);
   AnswerOnUdp(status);
+  Serial.println(status);
   
-  FadeLoop(fadeFrameTime, isRainbow, &udp);
+  setLoopMode(fadeMode);
+  setLoopFrameTime(fadeFrameTime);
+  setLoopAlpha(fadeAlpha);
+  FadeLoop(&udp);
 }
 
 // Method - Resets state if something was interrupted
@@ -104,7 +138,7 @@ void ResetState()
 {
   if (strstr(status, "Fade"))
   {
-    FadeLoop(-1, -1, &udp);
+    FadeLoop(&udp);
   }
 }
 
@@ -127,7 +161,7 @@ void setup()
 
   ledcSetup(LED_CHANNEL_BLUE, LEDC_BASE_FREQ, LEDC_TIMER_13_BIT);
   ledcAttachPin(LED_PIN_BLUE, LED_CHANNEL_BLUE);
-
+  
   // Open Serial Printing
   Serial.begin(115200);
   Serial.println();
@@ -166,7 +200,7 @@ void loop()
     Serial.println();
     
     /*Answers the current status
-    (Status --> Fade, Status --> 255:255:255:255, Status --> Off)*/
+    (Status:deviceName --> Fade, Status:deviceName --> 255:255:255:255, Status:deviceName --> Off)*/
     if (strstr(udpMessage, "Status"))
     {
       Serial.println("Status Command!");
@@ -178,17 +212,17 @@ void loop()
     }
 
     /*Set Wifi Credentials
-    (Credentials:Ssid:Password --> It will connect with(Ssid,Password)*/
+    (Credentials:ssid:password --> It will connect with(Ssid,Password)*/
     else if (strstr(udpMessage, "Credentials"))
     {
       Serial.println("Credentials Command!");
       SaveWifiCredentials(udpMessage);
     }
 
-    // Fade (Fade --> Normal fade, FadeSpeed:(0-100) --> Customized fade)
-    else if (strstr(udpMessage, "Fade") || strstr(udpMessage, "Rainbow"))
+    // Fade (Fade:mode:speed:alpha --> Starts Fade from the saved state, with given mode, speed, alpha)
+    else if (strstr(udpMessage, "Fade"))
     {
-      Serial.println("Some kind of Fade Command!");
+      Serial.println("Fade Command!");
       FadeMode(udpMessage);
     }
 
