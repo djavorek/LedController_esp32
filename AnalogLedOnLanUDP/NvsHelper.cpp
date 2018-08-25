@@ -102,3 +102,4 @@ void LoadWifiCredentials(char ssid[], int lengthSsid, char password[], int lengt
   password[0] = '\0';
   strncat(password, pw, lengthPassword - 1);
 }
+

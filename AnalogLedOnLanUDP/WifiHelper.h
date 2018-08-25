@@ -5,3 +5,4 @@
 void ConnectToWifi(char ssid[], char password[], char* deviceName);
 
 #endif /* WIFI_HELPER_H */
+

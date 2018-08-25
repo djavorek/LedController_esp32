@@ -3,6 +3,9 @@
 
 #include "WiFiUdp.h"
 
+// Doing sleep loops
+boolean SleepLoop(WiFiUDP* udp);
+
 // Doing fade loops
 void FadeLoop(WiFiUDP* udp);
 
@@ -22,3 +25,4 @@ void setLoopAlpha(double loopAlpha);
 void setFadeStartingPoint(int color[]);
 
 #endif /* FADE_HELPER_H */
+

@@ -15,3 +15,4 @@ void WriteRGB(int RGB[])
   WriteToLedChannel(LED_CHANNEL_GREEN, RGB[1]);
   WriteToLedChannel(LED_CHANNEL_BLUE, RGB[2]);
 }
+

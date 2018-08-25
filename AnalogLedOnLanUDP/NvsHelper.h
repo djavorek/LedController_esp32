@@ -8,3 +8,4 @@ void SaveWifiCredentials(char message[]);
 void LoadWifiCredentials(char ssid[], int lengthSsid, char password[], int lengthPassword);
 
 #endif /* NVS_HELPER_H */
+

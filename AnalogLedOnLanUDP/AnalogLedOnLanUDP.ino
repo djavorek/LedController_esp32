@@ -133,12 +133,56 @@ void FadeMode(char message[])
   FadeLoop(&udp);
 }
 
+// Method - Parse the sleep properties from UDP Message
+void SleepMode(char message[])
+{
+  char * sleepProperty;
+  int hours = 0;
+  int minutes = 1;
+  int totalTime = 0;
+
+  // Sleep String
+  sleepProperty = strtok (message, ":");
+  
+  // Hours
+  sleepProperty = strtok (NULL, ":");
+  if (sleepProperty != NULL)
+  {
+    hours = atoi(sleepProperty);
+  }
+  
+  // Minutes
+  sleepProperty = strtok (NULL, ":");
+  if (sleepProperty != NULL)
+  {
+    minutes = atoi(sleepProperty);
+  }
+  
+  sprintf(status, "Sleep:%d:%d", hours, minutes);
+  AnswerOnUdp(status);
+  Serial.println(status);
+  
+  minutes += hours * 60;
+  totalTime = minutes * 60000; // 1min = 60000ms
+  
+  setLoopFrameTime(totalTime);
+  boolean done = SleepLoop(&udp);
+  if(done)
+  {
+    sprintf(status, "Off");
+  }
+}
+
 // Method - Resets state if something was interrupted
 void ResetState()
 {
   if (strstr(status, "Fade"))
   {
     FadeLoop(&udp);
+  }
+  if (strstr(status, "Sleep"))
+  {
+    SleepLoop(&udp);
   }
 }
 
@@ -226,6 +270,13 @@ void loop()
       FadeMode(udpMessage);
     }
 
+    // Sleep
+    else if (strstr(udpMessage, "Sleep"))
+    {
+      Serial.println("Sleep Command!");
+      SleepMode(udpMessage);
+    }
+    
     // RGBA Color Code (255:255:255:255 --> White)
     else if (strchr(udpMessage, ':'))
     {

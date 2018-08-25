@@ -23,33 +23,33 @@ int fadePalette[6][3] =
   {0, 235, 255}
 };
 
-boolean FadeToColorWithFrameTime(int currentColor[], int fadeTo[], int frameTime, WiFiUDP* udp)
+boolean FadeToColorWithFrameTime(int from[], int fadeTo[], int frameTime, WiFiUDP* udp)
 {
   int difference[3];
   
   for (int component = 0; component < 3; component++)
   {
-    difference[component] = currentColor[component] - fadeTo[component];
+    difference[component] = from[component] - fadeTo[component];
     if(difference[component] < 0)
     {
-       difference[component] *= (-1);
+      difference[component] *= (-1);
     }
   }
   
-  while (currentColor[0] != fadeTo[0] || currentColor[1] != fadeTo[1] || currentColor[2] != fadeTo[2])
+  while (from[0] != fadeTo[0] || from[1] != fadeTo[1] || from[2] != fadeTo[2])
   {
     int actualMaxDifference = 15;
     
     for (int component = 0; component < 3 ; component++)
     {       
-      if(currentColor[component] < fadeTo[component])
+      if(from[component] < fadeTo[component])
       {
-        currentColor[component]++;
+        from[component]++;
         difference[component]--;
       }
-      else if(currentColor[component] > fadeTo[component])
+      else if(from[component] > fadeTo[component])
       {
-        currentColor[component]--;
+        from[component]--;
         difference[component]--;
       }
         
@@ -62,11 +62,11 @@ boolean FadeToColorWithFrameTime(int currentColor[], int fadeTo[], int frameTime
     // If UDP Received, stop fading
     if (udp->parsePacket() != 0)
     {
-      memcpy(from, currentColor, sizeof(currentColor));
+      memcpy(from, from, sizeof(from));
       return false;
     }
     
-    WriteRGB(currentColor);
+    WriteRGB(from);
     
     //Using the third root of difference for the optimal result
     int normalizedFrameTime = frameTime / pow(actualMaxDifference, 1.0 / 3);
@@ -78,6 +78,57 @@ boolean FadeToColorWithFrameTime(int currentColor[], int fadeTo[], int frameTime
     }
 
     delay(normalizedFrameTime);
+  }
+  return true;
+}
+
+boolean SleepLoop(WiFiUDP* udp)
+{
+  int maxDifference = 1;
+  int udpCheckTime = 200;
+  int sleepFrameTime;
+  div_t delayCyclesNeeded;
+  
+  interrupted = false;
+  for (int component = 0; component < 3; component++)
+  { 
+    if(from[component] > maxDifference)
+    {
+      maxDifference = from[component]; 
+    }
+  }
+  
+  sleepFrameTime = frameTime / maxDifference;
+  delayCyclesNeeded = div(sleepFrameTime, udpCheckTime);
+  
+  while (from[0] != 0 || from[1] != 0 || from[2] != 0)
+  {
+    for (int component = 0; component < 3 ; component++)
+    {       
+      if(from[component] > 0)
+      {
+        from[component]--;
+      }
+    }
+    
+    WriteRGB(from);
+    delay(delayCyclesNeeded.rem);
+    //Remove from frameTime, in case loop gets interrupted
+    frameTime -= delayCyclesNeeded.rem;
+    
+    for(int i = 0; i < delayCyclesNeeded.quot; i++)
+    {
+      delay(udpCheckTime);
+      //Remove from frameTime, in case loop gets interrupted
+      frameTime -= udpCheckTime;
+      
+      // If UDP Received, stop fading
+      if (udp->parsePacket() != 0)
+      {
+        interrupted = true;
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -193,3 +244,4 @@ void setFadeStartingPoint(int color[])
   from[1] = color[1];
   from[2] = color[2];
  }
+
