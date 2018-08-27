@@ -61,7 +61,6 @@ void ColorCodeMode(char message[])
   }
   
   AnswerOnUdp(status);
-  Serial.println(status);
 
   //Intentionally written after status set, so the status is more meaningful (not showing black color)
   float alpha = (float)RGBA[3] / (float)255;
@@ -120,12 +119,11 @@ void FadeMode(char message[])
       fadeAlphaInt = 255; 
     }
   }
-  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.5) / (double)2;
+  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.3) / (double)2;
 
   // Updating status and sending it back as a response
   sprintf(status, "Fade:%d:%d:%d", fadeMode, fadeSpeed, fadeAlphaInt);
   AnswerOnUdp(status);
-  Serial.println(status);
   
   setLoopMode(fadeMode);
   setLoopFrameTime(fadeFrameTime);
@@ -160,7 +158,6 @@ void SleepMode(char message[])
   
   sprintf(status, "Sleep:%d:%d", hours, minutes);
   AnswerOnUdp(status);
-  Serial.println(status);
   
   minutes += hours * 60;
   totalTime = minutes * 60000; // 1min = 60000ms
@@ -173,14 +170,14 @@ void SleepMode(char message[])
   }
 }
 
-// Method - Resets state if something was interrupted
-void ResetState()
+// Method - Resets state, if a looped state  was interrupted
+void ResetState(char currentState[])
 {
-  if (strstr(status, "Fade"))
+  if (strstr(currentState, "Fade"))
   {
     FadeLoop(&udp);
   }
-  if (strstr(status, "Sleep"))
+  if (strstr(currentState, "Sleep"))
   {
     SleepLoop(&udp);
   }
@@ -192,6 +189,9 @@ void AnswerOnUdp(char message[])
   udp.beginPacket(udp.remoteIP(), responsePort);
   udp.print(message);
   udp.endPacket();
+  
+  Serial.print("Status sent: ");
+  Serial.println(message);
 }
 
 void setup()
@@ -251,7 +251,7 @@ void loop()
       if(strstr(udpMessage, deviceName))
       {
         AnswerOnUdp(status);
-        ResetState();
+        ResetState(status);
       }
     }
 
