@@ -9,8 +9,8 @@ int frameTime;
 double alpha = 1;
 boolean interrupted;
 
-int sleepState[4] = {0, 0, 0, 255};
 int off[3] = {0, 0, 0};
+int sleepState[3] = {0, 0, 0};
 int from[3] = {0, 0, 0};
 int to[3];
 int nextColorFromPalette = 0;
@@ -86,12 +86,22 @@ boolean FadeToColorWithFrameTime(int from[], int fadeTo[], int frameTime, WiFiUD
 boolean SleepLoop(WiFiUDP* udp)
 {
   int udpCheckTime = 200;
-  int sleepFrameTime = frameTime / sleepState[3];
-  div_t delayCyclesNeeded = div(sleepFrameTime, udpCheckTime);
+  int maxDifference = 1;
   int fixedFrom[3] = {sleepState[0], sleepState[1], sleepState[2]};
   float alpha;
   
   interrupted = false;
+  
+  for (int component = 0; component < 3; component++)
+  { 
+    if(from[component] > maxDifference)
+    {
+      maxDifference = from[component]; 
+    }
+  }
+  int fixedMaxDifference = maxDifference;
+  int sleepFrameTime = frameTime / maxDifference;
+  div_t delayCyclesNeeded = div(sleepFrameTime, udpCheckTime);
   
   WriteRGB(from);
   delay(delayCyclesNeeded.rem);
@@ -99,8 +109,8 @@ boolean SleepLoop(WiFiUDP* udp)
   
   while (from[0] != 0 || from[1] != 0 || from[2] != 0)
   {
-    alpha = (float)sleepState[3] / (float)255;
-    sleepState[3]--;
+    alpha = (float)maxDifference / (float)fixedMaxDifference;
+    maxDifference--;
     from[0] = fixedFrom[0] * alpha;
     from[1] = fixedFrom[1] * alpha;
     from[2] = fixedFrom[2] * alpha;
@@ -236,6 +246,5 @@ void setFadeStartingPoint(int color[])
   sleepState[0] = color[0];
   sleepState[1] = color[1];
   sleepState[2] = color[2];
-  sleepState[3] = 255;
 }
 
