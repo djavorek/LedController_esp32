@@ -42,15 +42,14 @@ void SaveWifiCredentials(char message[])
       {
         credential = strtok (NULL, ":");
         err = nvs_set_str(handler, "secret", credential);
-        Serial.println("Set Secret: ");
-        Serial.println(credential);
+
       }
       else // If Wifi secret not provided, set it to empty string
       {
         err = nvs_set_str(handler, "secret", "");
-        Serial.println("Set Secret: ");
-        Serial.println(credential);
       }
+      Serial.println("Set Secret: ");
+      Serial.println(credential);
       
       err = nvs_commit(handler);
       Serial.println("");

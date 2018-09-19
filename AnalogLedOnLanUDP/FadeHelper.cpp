@@ -4,7 +4,10 @@
 
 #include "ColorHelper.h"
 
-boolean throughBlack;
+boolean throughBlack; //Which mode
+boolean toBlack = false; //In through black mode, which step
+int interruptedOff[3] = {0, 0, 0};
+
 int frameTime;
 double alpha = 1;
 boolean interrupted;
@@ -24,33 +27,35 @@ int fadePalette[6][3] =
   {0, 235, 255}
 };
 
-boolean FadeToColorWithFrameTime(int from[], int fadeTo[], int frameTime, WiFiUDP* udp)
+boolean FadeToColorWithFrameTime(int fadeFrom[], int fadeTo[], int frameTime, boolean dynamicFrameTime, WiFiUDP* udp)
 {
   int difference[3];
+  int actualColor[3] = {fadeFrom[0], fadeFrom[1], fadeFrom[2]};
   
   for (int component = 0; component < 3; component++)
   {
-    difference[component] = from[component] - fadeTo[component];
+    difference[component] = fadeFrom[component] - fadeTo[component];
     if(difference[component] < 0)
     {
       difference[component] *= (-1);
     }
   }
   
-  while (from[0] != fadeTo[0] || from[1] != fadeTo[1] || from[2] != fadeTo[2])
+  while (actualColor[0] != fadeTo[0] || actualColor[1] != fadeTo[1] || actualColor[2] != fadeTo[2])
   {
     int actualMaxDifference = 15;
+    int normalizedFrameTime = 50;
     
     for (int component = 0; component < 3 ; component++)
     {       
-      if(from[component] < fadeTo[component])
+      if(actualColor[component] < fadeTo[component])
       {
-        from[component]++;
+        actualColor[component]++;
         difference[component]--;
       }
-      else if(from[component] > fadeTo[component])
+      else if(actualColor[component] > fadeTo[component])
       {
-        from[component]--;
+        actualColor[component]--;
         difference[component]--;
       }
         
@@ -63,19 +68,26 @@ boolean FadeToColorWithFrameTime(int from[], int fadeTo[], int frameTime, WiFiUD
     // If UDP Received, stop fading
     if (udp->parsePacket() != 0)
     {
-      memcpy(from, from, sizeof(from));
+      memcpy(from, actualColor, sizeof(actualColor));
       return false;
     }
     
-    WriteRGB(from);
+    WriteRGB(actualColor);
     
-    //Using the third root of difference for the optimal result
-    int normalizedFrameTime = frameTime / pow(actualMaxDifference, 1.0 / 3);
-    
-    //Defense against too long, too visible frames (not less than about 15fps)
-    if(normalizedFrameTime > 70)
+    if(dynamicFrameTime)
     {
-      normalizedFrameTime = 70;
+      //Using the third root of difference
+      normalizedFrameTime = frameTime / pow(actualMaxDifference, 1.0 / 3);
+    }
+    else
+    {
+      normalizedFrameTime = frameTime / 2;
+    }
+    
+    //Defense against too long, too visible frames (not less than about 12fps)
+    if(normalizedFrameTime > 83)
+    {
+      normalizedFrameTime = 83;
     }
 
     delay(normalizedFrameTime);
@@ -150,13 +162,32 @@ void FadeLoop(WiFiUDP* udp)
       
       if(throughBlack)
       {
-        isDone = FadeToColorWithFrameTime(from, off, normalizedFrameTime, udp);
+        if(toBlack)
+        {
+          isDone = FadeToColorWithFrameTime(from, off, normalizedFrameTime, true, udp);
+        }
+
+        if(isDone)
+        {
+           isDone = FadeToColorWithFrameTime(interruptedOff, to, normalizedFrameTime, false, udp);
+           
+           if(!isDone)
+           {
+             toBlack = false;
+             memcpy(interruptedOff, from, sizeof(from));
+           }
+           else
+           {
+             toBlack = true;
+             memcpy(interruptedOff, off, sizeof(off));
+           }
+        }
       }
       else
       {
-        isDone = FadeToColorWithFrameTime(from, to, normalizedFrameTime, udp);
+        isDone = FadeToColorWithFrameTime(from, to, normalizedFrameTime, true, udp);
       }
-      if (isDone != true)
+      if (!isDone)
       {
         nextColorFromPalette = color;
         interrupted = true;
@@ -184,9 +215,9 @@ boolean isFadeInterrupted()
   return false; 
 }
 
-void setLoopMode(int loopMode)
+void setFadeMode(int fadeMode)
 {
-  if(loopMode == 1)
+  if(fadeMode == 1)
   {
     throughBlack = true; 
   }
@@ -196,20 +227,9 @@ void setLoopMode(int loopMode)
   }
 }
 
-void setLoopFrameTime(int loopFrameTime)
+void setFadeProperties(double loopAlpha, int loopFrameTime)
 {
-  if(loopFrameTime > 0)
-  {
-     frameTime = loopFrameTime; 
-  }
-  else
-  {
-    frameTime = 1;
-  }
-}
-
-void setLoopAlpha(double loopAlpha)
-{
+  //  ALPHA
   //Vanishing the result of old alpha
   from[0] = from[0] / alpha;
   from[1] = from[1] / alpha;
@@ -218,13 +238,13 @@ void setLoopAlpha(double loopAlpha)
   //Changing the alpha
   if(loopAlpha <= 1)
   {
-    if(loopAlpha > 0.15)
+    if(loopAlpha > 0.10)
     {
        alpha = loopAlpha;
     }
     else
     {
-       alpha = 0.15; 
+       alpha = 0.10; 
     }
   }
   else
@@ -236,6 +256,16 @@ void setLoopAlpha(double loopAlpha)
   from[0] = from[0] * alpha;
   from[1] = from[1] * alpha;
   from[2] = from[2] * alpha;
+  
+  //  FRAME TIME
+  if(loopFrameTime > 0)
+  {
+     frameTime = loopFrameTime * ((double)1 / alpha);
+  }
+  else
+  {
+     frameTime = 1;
+  }
 }
 
 void setFadeStartingPoint(int color[])

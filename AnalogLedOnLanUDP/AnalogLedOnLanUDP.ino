@@ -119,15 +119,14 @@ void FadeMode(char message[])
       fadeAlphaInt = 255; 
     }
   }
-  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.3) / (double)2;
+  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.2) / (double)2;
 
   // Updating status and sending it back as a response
   sprintf(status, "Fade:%d:%d:%d", fadeMode, fadeSpeed, fadeAlphaInt);
   AnswerOnUdp(status);
   
-  setLoopMode(fadeMode);
-  setLoopFrameTime(fadeFrameTime);
-  setLoopAlpha(fadeAlpha);
+  setFadeMode(fadeMode);
+  setFadeProperties(fadeAlpha, fadeFrameTime);
   FadeLoop(&udp);
 }
 
@@ -162,7 +161,7 @@ void SleepMode(char message[])
   minutes += hours * 60;
   totalTime = minutes * 60000; // 1min = 60000ms
   
-  setLoopFrameTime(totalTime);
+  setFadeProperties(1, totalTime);
   boolean done = SleepLoop(&udp);
   if(done)
   {
@@ -232,7 +231,7 @@ void loop()
   if (udp.parsePacket() || isFadeInterrupted())
   {
     // Read the UDP packet into a message variable
-    int msgLength = udp.read(udpMessage, 255);
+    int msgLength = udp.read(udpMessage, 128);
     if (msgLength > 0)
     {
       udpMessage[msgLength] = 0;

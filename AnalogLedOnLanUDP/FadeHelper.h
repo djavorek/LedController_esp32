@@ -13,13 +13,10 @@ void FadeLoop(WiFiUDP* udp);
 boolean isFadeInterrupted();
 
 // Set mode for fade loop
-void setLoopMode(int loopMode);
+void setFadeMode(int loopMode);
 
-// Set frame time for fade loop
-void setLoopFrameTime(int loopFrameTime);
-
-// Set alpha for fade loop
-void setLoopAlpha(double loopAlpha);
+// Set alpa and frame time for fade loop
+void setFadeProperties(double loopAlpha, int loopFrameTime);
 
 // Set the starting point of the fade
 void setFadeStartingPoint(int color[]);
