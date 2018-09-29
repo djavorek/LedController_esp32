@@ -4,6 +4,7 @@
 
 #include "ColorHelper.h"
 
+static const int maxFrameTime = 200; // 5 fps 
 boolean throughBlack; //Which mode
 boolean toBlack = false; //In through black mode, which step
 int interruptedOff[3] = {0, 0, 0};
@@ -81,15 +82,8 @@ boolean FadeToColorWithFrameTime(int fadeFrom[], int fadeTo[], int frameTime, bo
     }
     else
     {
-      normalizedFrameTime = frameTime / 2;
+      normalizedFrameTime = frameTime / 5; //5: Third root of avarage difference 
     }
-    
-    //Defense against too long, too visible frames (not less than about 12fps)
-    if(normalizedFrameTime > 83)
-    {
-      normalizedFrameTime = 83;
-    }
-
     delay(normalizedFrameTime);
   }
   return true;
@@ -150,7 +144,6 @@ void FadeLoop(WiFiUDP* udp)
 {
   interrupted = false;
   boolean isDone = true;
-  int normalizedFrameTime = (int)(frameTime * (255 / (255 * alpha)));
   
   do
   {
@@ -164,12 +157,12 @@ void FadeLoop(WiFiUDP* udp)
       {
         if(toBlack)
         {
-          isDone = FadeToColorWithFrameTime(from, off, normalizedFrameTime, true, udp);
+          isDone = FadeToColorWithFrameTime(from, off, frameTime, true, udp);
         }
 
         if(isDone)
         {
-           isDone = FadeToColorWithFrameTime(interruptedOff, to, normalizedFrameTime, false, udp);
+           isDone = FadeToColorWithFrameTime(interruptedOff, to, frameTime, false, udp);
            
            if(!isDone)
            {
@@ -185,7 +178,7 @@ void FadeLoop(WiFiUDP* udp)
       }
       else
       {
-        isDone = FadeToColorWithFrameTime(from, to, normalizedFrameTime, true, udp);
+        isDone = FadeToColorWithFrameTime(from, to, frameTime, true, udp);
       }
       if (!isDone)
       {
@@ -205,7 +198,7 @@ void FadeLoop(WiFiUDP* udp)
   } while (WiFi.status() == WL_CONNECTED);
 }
 
-boolean isFadeInterrupted()
+boolean isInterrupted()
 {
   if(interrupted)
   {
@@ -227,8 +220,11 @@ void setFadeMode(int fadeMode)
   }
 }
 
-void setFadeProperties(double loopAlpha, int loopFrameTime)
+void setFadeProperties(int fadeAlpha, int fadeSpeed)
 {
+  //Limit the minimum alpha with static value
+  double newAlpha = (double)(fadeAlpha + 25) / (double)280;
+  
   //  ALPHA
   //Vanishing the result of old alpha
   from[0] = from[0] / alpha;
@@ -236,35 +232,26 @@ void setFadeProperties(double loopAlpha, int loopFrameTime)
   from[2] = from[2] / alpha;
   
   //Changing the alpha
-  if(loopAlpha <= 1)
-  {
-    if(loopAlpha > 0.10)
-    {
-       alpha = loopAlpha;
-    }
-    else
-    {
-       alpha = 0.10; 
-    }
-  }
-  else
-  {
-    alpha = 1;
-  }
+  alpha = newAlpha;
   
   //Using the new alpha
   from[0] = from[0] * alpha;
   from[1] = from[1] * alpha;
   from[2] = from[2] * alpha;
   
-  //  FRAME TIME
-  if(loopFrameTime > 0)
+  //  FRAME TIME (Depends on speed and alpha)
+  frameTime = (maxFrameTime - 15) * ((((256 - fadeSpeed) / (double)255) + ((256 - fadeAlpha) / (double)255)) / 2.00) + 15;
+}
+
+void setSleepProperties(int sleepTime)
+{
+  if(sleepTime > 0)
   {
-     frameTime = loopFrameTime * ((double)1 / alpha);
+     frameTime = sleepTime;
   }
   else
   {
-     frameTime = 1;
+     frameTime = 3000; //3 seconds, just to see something gone wrong
   }
 }
 

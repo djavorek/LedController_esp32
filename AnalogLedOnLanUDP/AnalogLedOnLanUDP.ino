@@ -3,8 +3,8 @@
 
 #include "WifiHelper.h"
 #include "NvsHelper.h"
-#include "FadeHelper.h"
 #include "ColorHelper.h"
+#include "FadeHelper.h"
 #include "LedDef.h"
 
 //Device Name
@@ -81,8 +81,7 @@ void FadeMode(char message[])
   int fadeMode = 0;
   int fadeSpeed = 128;
   int fadeFrameTime;
-  int fadeAlphaInt = 255;
-  double fadeAlpha;
+  int fadeAlpha = 255;
 
   //Fade String
   fadeProperty = strtok (message, ":");
@@ -103,30 +102,33 @@ void FadeMode(char message[])
     {
       fadeSpeed = 255; 
     }
+    else if(fadeSpeed < 1)
+    {
+      fadeSpeed = 1; 
+    }
   }
-  /* We actually use minor delays (and magic numbers to calculate them)
-  between frames, but for users the speed is more convenient 
-  Magic numbers: (definesFastest - fadeSpeed) / definesSlowest */
-  fadeFrameTime = (300 - fadeSpeed) / 2.2; 
   
   //Alpha
   fadeProperty = strtok (NULL, ":");
   if (fadeProperty != NULL)
   {
-    fadeAlphaInt = atoi(fadeProperty);
-    if(fadeAlphaInt > 255)
+    fadeAlpha = atoi(fadeProperty);
+    if(fadeAlpha > 255)
     {
-      fadeAlphaInt = 255; 
+      fadeAlpha = 255; 
+    }
+    else if(fadeAlpha < 1)
+    {
+      fadeAlpha = 1; 
     }
   }
-  fadeAlpha = (((double)fadeAlphaInt / (double)255) + 0.2) / (double)2;
 
   // Updating status and sending it back as a response
-  sprintf(status, "Fade:%d:%d:%d", fadeMode, fadeSpeed, fadeAlphaInt);
+  sprintf(status, "Fade:%d:%d:%d", fadeMode, fadeSpeed, fadeAlpha);
   AnswerOnUdp(status);
-  
+   
   setFadeMode(fadeMode);
-  setFadeProperties(fadeAlpha, fadeFrameTime);
+  setFadeProperties(fadeAlpha, fadeSpeed);
   FadeLoop(&udp);
 }
 
@@ -161,7 +163,7 @@ void SleepMode(char message[])
   minutes += hours * 60;
   totalTime = minutes * 60000; // 1min = 60000ms
   
-  setFadeProperties(1, totalTime);
+  setSleepProperties(totalTime);
   boolean done = SleepLoop(&udp);
   if(done)
   {
@@ -213,7 +215,13 @@ void setup()
   LoadWifiCredentials(ssid, sizeof(ssid), password, sizeof(password));
 
   // Connect to WiFi
-  ConnectToWifi(ssid, password, deviceName);
+  ConnectToWifi(ssid, password);
+  
+  // If WiFi cannot be connected, create WiFi hotspot
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    HostSoftAP(deviceName);
+  }
 
   // Open UDP
   udp.begin(port);
@@ -221,14 +229,14 @@ void setup()
 
 void loop()
 {
-  // If WiFi gets disconnected, tries to connect again
-  if (WiFi.status() != WL_CONNECTED && !WiFi.softAPIP())
+  // If WiFi gets disconnected, tries to reconnect
+  if (WiFi.status() != WL_CONNECTED && !isHotspotHosted())
   {
-    ConnectToWifi(ssid, password, deviceName);
+    ConnectToWifi(ssid, password);    
   }
 
   // Checking for new incoming UDP packet
-  if (udp.parsePacket() || isFadeInterrupted())
+  if (udp.parsePacket() || isInterrupted())
   {
     // Read the UDP packet into a message variable
     int msgLength = udp.read(udpMessage, 128);

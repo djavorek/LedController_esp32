@@ -9,14 +9,17 @@ boolean SleepLoop(WiFiUDP* udp);
 // Doing fade loops
 void FadeLoop(WiFiUDP* udp);
 
-// Getter for interrupted 
-boolean isFadeInterrupted();
+// Returns whether the loop was interrupted by another command or not
+boolean isInterrupted();
 
 // Set mode for fade loop
-void setFadeMode(int loopMode);
+void setFadeMode(int fadeMode);
 
-// Set alpa and frame time for fade loop
-void setFadeProperties(double loopAlpha, int loopFrameTime);
+// Set alpha and speed for fade loop
+void setFadeProperties(int fadeAlpha, int fadeSpeed);
+
+// Set total time of fade loop
+void setSleepProperties(int sleepTime);
 
 // Set the starting point of the fade
 void setFadeStartingPoint(int color[]);

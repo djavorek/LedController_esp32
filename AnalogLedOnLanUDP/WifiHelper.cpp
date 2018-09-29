@@ -1,29 +1,28 @@
 #include "HardwareSerial.h"
 #include "WiFi.h"
-#include "WiFiUdp.h"
 
 #include "ColorHelper.h"
+
+boolean hotspotHosted = false;
 
 void HostSoftAP(char* deviceName)
 {
   char softApSSID[50] = "Led_";
   strncat(softApSSID, deviceName, sizeof(softApSSID) - strlen(softApSSID)); 
-  WiFi.softAP(softApSSID);
+  WiFi.softAP(softApSSID, deviceName);
   IPAddress softIP = WiFi.softAPIP();
   Serial.println("");
   Serial.println("Soft-AP hosted on: ");
   Serial.print(softIP);
-  
-  int Info[3] = {40,40,40};
-  WriteRGB(Info); //Shows a dark color to tell something changed
 }
 
-void ConnectToWifi(char ssid[], char password[], char* deviceName) 
+void ConnectToWifi(char ssid[], char password[]) 
 {
   int retries = 0;
   Serial.println();
   Serial.print("Connecting to: ");
   Serial.println(ssid);
+  WiFi.disconnect(0);
   int status = WiFi.begin(ssid, password);
 
   do
@@ -34,17 +33,27 @@ void ConnectToWifi(char ssid[], char password[], char* deviceName)
     retries++;
   }while(status != WL_CONNECTED && retries < 10);
   
-  if(status != WL_CONNECTED)
-  {
-    HostSoftAP(deviceName);
-  }
-  else
+  if(status == WL_CONNECTED)
   {
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
   }
+  else
+  {
+    Serial.println("");
+    Serial.println("Cannot connect to WiFI");
+    
+    // Turns LED off
+    int off[] = {0, 0, 0};
+    WriteRGB(off);
+  }
+}
+
+boolean isHotspotHosted()
+{
+  return hotspotHosted;
 }
 
 
