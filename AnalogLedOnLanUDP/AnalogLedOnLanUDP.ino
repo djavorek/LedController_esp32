@@ -178,9 +178,13 @@ void ResetState(char currentState[])
   {
     FadeLoop(&udp);
   }
-  if (strstr(currentState, "Sleep"))
+  else if (strstr(currentState, "Sleep"))
   {
     SleepLoop(&udp);
+  }
+  else if (strstr(currentState, ":"))
+  {
+    ColorCodeMode(currentState);
   }
 }
 
@@ -232,7 +236,18 @@ void loop()
   // If WiFi gets disconnected, tries to reconnect
   if (WiFi.status() != WL_CONNECTED && !isHotspotHosted())
   {
-    ConnectToWifi(ssid, password);    
+    ConnectToWifi(ssid, password);
+    
+    // If it gets reconnected for the first try, state will be restored
+    // Otherwise led wil be turned off permanently
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      sprintf(status, "Off");
+    }
+    else
+    {
+      ResetState(status);
+    }
   }
 
   // Checking for new incoming UDP packet
