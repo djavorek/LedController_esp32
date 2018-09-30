@@ -9,11 +9,13 @@ void HostSoftAP(char* deviceName)
 {
   char softApSSID[50] = "Led_";
   strncat(softApSSID, deviceName, sizeof(softApSSID) - strlen(softApSSID)); 
-  WiFi.softAP(softApSSID, deviceName);
+  WiFi.softAP(softApSSID);
   IPAddress softIP = WiFi.softAPIP();
   Serial.println("");
   Serial.println("Soft-AP hosted on: ");
   Serial.print(softIP);
+  
+  hotspotHosted = true;
 }
 
 void ConnectToWifi(char ssid[], char password[]) 
@@ -22,7 +24,7 @@ void ConnectToWifi(char ssid[], char password[])
   Serial.println();
   Serial.print("Connecting to: ");
   Serial.println(ssid);
-  WiFi.disconnect(0);
+  WiFi.enableSTA(true);
   int status = WiFi.begin(ssid, password);
 
   do
@@ -31,7 +33,7 @@ void ConnectToWifi(char ssid[], char password[])
     delay(4000);
     status = WiFi.begin(ssid, password);
     retries++;
-  }while(status != WL_CONNECTED && retries < 10);
+  }while(status != WL_CONNECTED && retries < 5);
   
   if(status == WL_CONNECTED)
   {
@@ -39,6 +41,7 @@ void ConnectToWifi(char ssid[], char password[])
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+    hotspotHosted = false;
   }
   else
   {
