@@ -3,10 +3,10 @@
 
 #include "Arduino.h"
 
-//Method - Writes intensity to *LED Color Channels*
-void WriteToLedChannel(uint8_t channel, uint32_t value);
+// Writes intensity to *LED Color Channels*
+void writeToLedChannel(uint8_t channel, uint32_t value);
 
-// Method - Writes RGB Array To LED in one step
-void WriteRGB(int RGB[]);
+// Writes RGB Array To LED in one step
+void writeRGB(int RGB[]);
 
 #endif /* COLOR_HELPER_H */

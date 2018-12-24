@@ -4,7 +4,8 @@
 
 #include "ColorHelper.h"
 
-static const int maxFrameTime = 200; // 5 fps 
+static const int maxFrameTime = 200; // 5 fps
+static const int minFrameTime = 15; // about 65 fps
 boolean throughBlack; //Which mode
 boolean toBlack = false; //In through black mode, which step
 int interruptedOff[3] = {0, 0, 0};
@@ -82,7 +83,7 @@ boolean FadeToColorWithFrameTime(int fadeFrom[], int fadeTo[], int frameTime, bo
     }
     else
     {
-      normalizedFrameTime = frameTime / 5; //5: Third root of avarage difference 
+      normalizedFrameTime = frameTime / 5; //5: Third root of average difference
     }
     delay(normalizedFrameTime);
   }
@@ -240,7 +241,9 @@ void setFadeProperties(int fadeAlpha, int fadeSpeed)
   from[2] = from[2] * alpha;
   
   //  FRAME TIME (Depends on speed and alpha)
-  frameTime = (maxFrameTime - 15) * ((((256 - fadeSpeed) / (double)255) + ((256 - fadeAlpha) / (double)255)) / 2.00) + 15;
+  frameTime = (maxFrameTime - minFrameTime) * ((((256 - fadeSpeed) / (double)255) + (1.00 - newAlpha)) / 2.00) + minFrameTime;
+  Serial.print("FRAME TIME: ");
+  Serial.println(frameTime);
 }
 
 void setSleepProperties(int sleepTime)

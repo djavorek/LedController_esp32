@@ -23,7 +23,7 @@ WiFiUDP udp;
 // Status
 char status[25] = "Off";
 
-// Method - Parses the color code from UDP Message and writes it to the LED (e.g.: 255:255:255:255 --> White)
+// Parses the color code from UDP Message and writes it to the LED (e.g.: 255:255:255:255 --> White)
 void ColorCodeMode(char message[])
 {
   int RGBA[4] = {0, 0, 0, 255};
@@ -74,7 +74,7 @@ void ColorCodeMode(char message[])
   WriteRGB(RGBA);
 }
 
-// Method - Parse the fade properties from UDP Message
+// Parses the fade properties from UDP Message
 void FadeMode(char message[])
 {
   char * fadeProperty;
@@ -132,7 +132,7 @@ void FadeMode(char message[])
   FadeLoop(&udp);
 }
 
-// Method - Parse the sleep properties from UDP Message
+// Parses the sleep properties from UDP Message
 void SleepMode(char message[])
 {
   char * sleepProperty;
@@ -171,7 +171,7 @@ void SleepMode(char message[])
   }
 }
 
-// Method - Resets state, if a looped state  was interrupted
+// Resets state, if a looped state was interrupted
 void ResetState(char currentState[])
 {
   if (strstr(currentState, "Fade"))
@@ -188,7 +188,7 @@ void ResetState(char currentState[])
   }
 }
 
-// Method - Sends a response message to the last client
+// Sends a response message to the last client, it communicated with
 void AnswerOnUdp(char message[])
 {
   udp.beginPacket(udp.remoteIP(), responsePort);
@@ -221,7 +221,7 @@ void setup()
   // Connect to WiFi
   ConnectToWifi(ssid, password);
   
-  // If WiFi cannot be connected, create WiFi hotspot
+  // If WiFi cannot be connected, create WiFi HotSpot
   if(WiFi.status() != WL_CONNECTED)
   {
     HostSoftAP(deviceName);

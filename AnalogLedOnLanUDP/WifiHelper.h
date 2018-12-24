@@ -7,7 +7,7 @@ void HostSoftAP(char* deviceName);
 // Connects to WiFi with the given parameters
 void ConnectToWifi(char ssid[], char password[]);
 
-// If hotspot gets hosted it will remain true until the next restart
+// If HotSpot gets hosted it will remain true until the next restart
 boolean isHotspotHosted();
 
 #endif /* WIFI_HELPER_H */
